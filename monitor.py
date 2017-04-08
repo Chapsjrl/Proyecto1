@@ -47,6 +47,7 @@ def get_carga_cpu():
     mutex['carga_cpu'].acquire()
     for cpu in range(cpu_num):
         carga_cpu[cpu] = psutil.cpu_percent(percpu=True)
+    show_cargas()
     mutex['carga_cpu'].release()
     sleep(0.1)
 
@@ -94,7 +95,7 @@ def get_usd_vmem():
 
 
 def get_procesos():
-    global stad_procesos
+    global stad_procesos    
     mutex['stad_procesos'].acquire()
     for proceso in psutil.process_iter():
         try: 
@@ -104,28 +105,39 @@ def get_procesos():
             pass     
     show_procesos()
     mutex['stad_procesos'].release()
-    sleep(0.1)
 
 
 def show_procesos():
     if 'stad_procesos' in campos:
-        for i in range(len(psutil.pids())):
+        num_procs = len(psutil.pids())
+        for i in range(num_procs):
+            variable.set(str(num_procs)+' Procesos en ejecución')
             treeProcesos.insert('', 'end', text=stad_procesos[i]['name'],
                                     values=(stad_procesos[i]['pid'],
                                             stad_procesos[i]['username'],
                                             stad_procesos[i]['cpu_percent'],
                                             stad_procesos[i]['memory_percent'],
                                             stad_procesos[i]['status']))
+        ventana.after(1500, clear_procesos)
+
+def clear_procesos():
+    x = treeProcesos.get_children()
+    if x != '()':
+        for child in x:
+            treeProcesos.delete(child)
+    get_procesos()
+            
 
 def show_cargas():
     if 'carga_cpu' in campos:
         mutex['carga_cpu'].acquire()
         for cpu in range(cpu_num):
-            porciento = carga_cpu[cpu]
-            before = 'CPU%s' % str(cpu + 1)
-            after = '%04.1f%%' % porciento
-            w.coords(i, new_xy) # change coordinates
-            w.itemconfig(i, fill="blue") # change color
+            percent = carga_cpu[cpu]
+            prefijo = 'CPU%s' % str(cpu + 1)
+            sufijo = '%04.1f%%' % percent
+            cadena = prefijo + sufijo
+            liststatus.insert(END, cadena)
+            
 
     #     mutex['carga_cpu'].release()
     # if 'stad_cpu' in show:
@@ -151,8 +163,8 @@ def show_cargas():
 
 
 def main():
-    # thr_cpu_ld = threading.Thread(target=get_carga_cpu)
-    # thr_cpu_ld.start()
+    thr_cpu_ld = threading.Thread(target=get_carga_cpu)
+    thr_cpu_ld.start()
     # thr_cpu_st = threading.Thread(target=get_stad_cpu)
     # thr_cpu_st.start()
     # thr_swp_us =  threading.Thread(target=get_usd_vmem)
@@ -162,13 +174,14 @@ def main():
     thr_prc =  threading.Thread(target=get_procesos)
     thr_prc.start()
 
-    while 1:
-        sleep(1)
-        show_procesos()
+    # while 1:
+    #     sleep(.5)
+    #     clear_procesos()
+
 
 ventana = Tk()
 ventana.title("Proyecto 1: Monitor de SO")
-
+ventana.iconbitmap(default='system-monitor.ico')
 ventana.geometry("700x600+0+0")
 
 note = ttk.Notebook(ventana, height=25)
@@ -176,7 +189,7 @@ note = ttk.Notebook(ventana, height=25)
 tab1 = Frame(note)
 tab2 = Frame(note)
 
-note.add(tab1, text = "Procesos",)
+note.add(tab1, text = "Procesos")
 note.add(tab2, text = "Máquina")
 
 treeProcesos = ttk.Treeview(tab1)
@@ -188,7 +201,6 @@ scrollProcesos.pack(side=RIGHT, fill=Y)
 
 treeProcesos['yscrollcommand'] = scrollProcesos.set
 treeProcesos.column("PId", width=100)
-
 treeProcesos.column("Usuario", width=120)
 treeProcesos.column("CPU %", width=90)
 treeProcesos.column("Memoria %", width=90)
@@ -199,12 +211,21 @@ treeProcesos.heading("CPU %", text="% CPU")
 treeProcesos.heading("Memoria %", text="% Memoria")
 treeProcesos.heading("Estado", text="Estado")
 
-w = Canvas(tab2, width=200, height=100)
+for i in treeProcesos.get_children():
+    treeProcesos.delete(i)
 
 
-w.pack()
+liststatus = Listbox(tab2, width=15)
+
+variable=StringVar()        
+lblstatus=Label(ventana, bd=1, state=ACTIVE, relief=SUNKEN, anchor=W,
+                        textvariable=variable,
+                        font=('arial',9,'normal'))
+
+lblstatus.pack(side=BOTTOM, fill=X)        
 treeProcesos.pack(side=LEFT, fill=BOTH, expand=1)
+liststatus.pack(side=LEFT, fill=Y)
 note.pack(side=LEFT, fill=BOTH, expand=1)
 scrollProcesos.config(command=treeProcesos.yview)
-ventana.after(5, get_procesos)
+ventana.after(1500, clear_procesos)
 ventana.mainloop()

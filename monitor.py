@@ -95,14 +95,14 @@ def get_usd_vmem():
 
 
 def get_procesos():
-    global stad_procesos    
+    global stad_procesos
     mutex['stad_procesos'].acquire()
     for proceso in psutil.process_iter():
-        try: 
-            stad_procesos.append(proceso.as_dict(['pid', 'name', 'username','cpu_percent',
+        try:
+            stad_procesos.append(proceso.as_dict(['pid', 'name', 'username', 'cpu_percent',
                                                   'memory_percent', 'status']))
         except psutil.NoSuchProcess:
-            pass     
+            pass
     show_procesos()
     mutex['stad_procesos'].release()
 
@@ -111,14 +111,14 @@ def show_procesos():
     if 'stad_procesos' in campos:
         num_procs = len(psutil.pids())
         for i in range(num_procs):
-            variable.set(str(num_procs)+' Procesos en ejecución')
+            variable.set(str(num_procs) + ' Procesos en ejecución')
             treeProcesos.insert('', 'end', text=stad_procesos[i]['name'],
                                     values=(stad_procesos[i]['pid'],
                                             stad_procesos[i]['username'],
                                             stad_procesos[i]['cpu_percent'],
                                             stad_procesos[i]['memory_percent'],
                                             stad_procesos[i]['status']))
-        ventana.after(1500, clear_procesos)
+        tab1.after(1500, clear_procesos)
 
 def clear_procesos():
     x = treeProcesos.get_children()
@@ -126,7 +126,7 @@ def clear_procesos():
         for child in x:
             treeProcesos.delete(child)
     get_procesos()
-            
+
 
 def show_cargas():
     if 'carga_cpu' in campos:
@@ -137,7 +137,6 @@ def show_cargas():
             sufijo = '%04.1f%%' % percent
             cadena = prefijo + sufijo
             liststatus.insert(END, cadena)
-            
 
     #     mutex['carga_cpu'].release()
     # if 'stad_cpu' in show:
@@ -159,7 +158,6 @@ def show_cargas():
     #     porciento = stad_vmem[2]
     #     mutex['stad_vmem'].release()
     #     usd_total = '%4s / %4s' % (usado, total)
-    
 
 
 def main():
@@ -171,7 +169,7 @@ def main():
     # thr_swp_us.start()
     # thr_mem_us =  threading.Thread(target=get_usd_mem)
     # thr_mem_us.start()
-    thr_prc =  threading.Thread(target=get_procesos)
+    thr_prc = threading.Thread(target=get_procesos)
     thr_prc.start()
 
     # while 1:
@@ -189,8 +187,8 @@ note = ttk.Notebook(ventana, height=25)
 tab1 = Frame(note)
 tab2 = Frame(note)
 
-note.add(tab1, text = "Procesos")
-note.add(tab2, text = "Máquina")
+note.add(tab1, text="Procesos")
+note.add(tab2, text="Máquina")
 
 treeProcesos = ttk.Treeview(tab1)
 
@@ -217,15 +215,15 @@ for i in treeProcesos.get_children():
 
 liststatus = Listbox(tab2, width=15)
 
-variable=StringVar()        
-lblstatus=Label(ventana, bd=1, state=ACTIVE, relief=SUNKEN, anchor=W,
-                        textvariable=variable,
-                        font=('arial',9,'normal'))
+variable = StringVar()
+lblstatus = Label(ventana, bd=1, state=ACTIVE, relief=SUNKEN, anchor=W,
+                  textvariable=variable,
+                  font=('arial', 9, 'normal'))
 
-lblstatus.pack(side=BOTTOM, fill=X)        
+lblstatus.pack(side=BOTTOM, fill=X)
 treeProcesos.pack(side=LEFT, fill=BOTH, expand=1)
 liststatus.pack(side=LEFT, fill=Y)
 note.pack(side=LEFT, fill=BOTH, expand=1)
 scrollProcesos.config(command=treeProcesos.yview)
-ventana.after(1500, clear_procesos)
+tab1.after(1500, clear_procesos)
 ventana.mainloop()

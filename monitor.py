@@ -1,25 +1,15 @@
 #!/usr/bin/env python3
 
-from tkinter import *
+import tkinter as tk
 from tkinter import ttk
+from tkinter import *
 from time import sleep
 import threading
 import psutil
 
-
 cpu_num = psutil.cpu_count(logical=False)
-carga_cpu = ()
-stad_cpu = {}
-stad_mem = ()
-stad_vmem = ()
-stad_procesos = []
-
-campos = ('carga_cpu', 'stad_cpu', 'stad_mem', 'stad_vmem', 'stad_procesos')
-
-mutex = {}
-for i in campos:
-    mutex[i] = threading.Semaphore(1)
-
+barcpu = []
+lblCPU = []
 
 def bytes2human(n):
     """
@@ -43,15 +33,15 @@ def bytes2human(n):
     return "%sB" % n
 
 def get_carga_cpu():
-    global carga_cpu
-    mutex['carga_cpu'].acquire()
+    carga_cpu = ()
+    carga_cpu = psutil.cpu_percent(percpu=True)
     for cpu in range(cpu_num):
-        carga_cpu[cpu] = psutil.cpu_percent(percpu=True)
-    mutex['carga_cpu'].release()
-    sleep(0.1)
+        cpuStr[cpu].set('CPU%i %04.1f%%'%(cpu+1, carga_cpu[cpu]))
+        barcpu[cpu]['value'] = int(float(carga_cpu[cpu]) / 100 * barcpu[cpu]['maximum'])
+    get_usd_mem()
+    tab2.after(1000, get_carga_cpu)
 
-def get_stad_cpu():
-    global stad_cpu
+def get_stads_proc():
     tiempo = psutil.cpu_times_percent(percpu=False)
     freqs = []
     tiempos = {
@@ -59,98 +49,107 @@ def get_stad_cpu():
         'Sistema': tiempo.system,
         'Inactivo': tiempo.idle
     }
+    for stad in tiempos:
+        variable.set(variable.get() + '\t %s: %04.1f%%' % (stad, tiempos[stad]))
+    
     for freq in psutil.cpu_freq(percpu=True):
         freqs.append(freq.current)
-    mutex['stad_cpu'].acquire()
-    stad_cpu = {
-        'tiempo': tiempos,
-        'freq': freqs
-    }
-    mutex['stad_cpu'].release()
-    sleep(0.1)
+    for i in range(len(freqs)):
+        variable.set(variable.get() + '\tCPU%s: %03.1f GHz' % (i, freqs[i] / 1000))
 
 def get_usd_mem():
-    global stad_mem
-    mutex['stad_mem'].acquire()
-    stad_mem = (
-        bytes2human(psutil.virtual_memory().total),
-        bytes2human(psutil.virtual_memory().used),
-        psutil.virtual_memory().percent
-    )
-    mutex['stad_mem'].release()
-    sleep(0.1)
+    usado = bytes2human(psutil.virtual_memory().used)
+    total = bytes2human(psutil.virtual_memory().total)
+    porciento = psutil.virtual_memory().percent
+    ramStr.set('RAM %4s / %4s' %(usado, total))
+    barRam['value'] = int(float(porciento) / 100 * barRam['maximum'])
+    get_usd_vmem()
 
 
 def get_usd_vmem():
-    global stad_vmem
-    mutex['stad_vmem'].acquire()
-    stad_vmem = (
-        bytes2human(psutil.swap_memory().total),
-        bytes2human(psutil.swap_memory().used),
-        psutil.swap_memory().percent
-    )
-    mutex['stad_vmem'].release()
-    sleep(0.1)
+    usado = bytes2human(psutil.swap_memory().used)
+    total = bytes2human(psutil.swap_memory().total)
+    porciento = psutil.swap_memory().percent
+    vramStr.set('SWAP %4s / %4s' %(usado, total))
+    barVram['value'] = int(float(porciento) / 100 * barRam['maximum'])
 
 
 def get_procesos():
-    global stad_procesos
-    mutex['stad_procesos'].acquire()
-    for proceso in psutil.process_iter():
-        try: 
-            stad_procesos.append(proceso.as_dict(['pid', 'name', 'username','cpu_percent',
-                                                  'memory_percent', 'status']))
+    stad_procesos = []
+    # mutex['stad_procesos'].acquire()
+    stad_procesos = list(psutil.process_iter())
+    for p in stad_procesos:
+        try:
+            p._name = p.name()
+            p._pid = p.ppid()
+            try:
+                    p._username = p.username()
+            except:
+                    p._username = '?'
+            p._cpu = p.cpu_percent(interval=0)
+            p._ram = '%04.1f'%p.memory_percent()
+            p._status = p.status()
         except psutil.NoSuchProcess:
-            pass     
-    show_procesos()
-    mutex['stad_procesos'].release()
-    sleep(0.1)
+            stad_procesos.remove(p)
+        num_procs = len(psutil.pids())
+        variable.set(str(num_procs) + ' Procesos en ejecución')
+        get_stads_proc()
+        treeProcesos.insert('', 'end', text=p._name,
+                                    values=(p._pid,
+                                            p._username,
+                                            p._cpu,
+                                            p._ram,
+                                            p._status))
+
+    tab1.after(2000, clear_procesos)
+    # mutex['stad_procesos'].release()
+
+def treeview_sort_column(tv, col, reverse):
+    l = [(tv.set(k, col), k) for k in tv.get_children('')]
+    l.sort(reverse=reverse)
+
+    # rearrange items in sorted positions
+    for index, (val, k) in enumerate(l):
+        tv.move(k, '', index)
+
+    # reverse sort next time
+    tv.heading(col, command=lambda: \
+               treeview_sort_column(tv, col, not reverse))
+
+# def show_procesos():
+#     if 'stad_procesos' in campos:
+#         num_procs = len(psutil.pids())
+#         for i in range(num_procs):
+#             variable.set(str(num_procs) + ' Procesos en ejecución')
+#             treeProcesos.insert('', 'end', text=stad_procesos[i]['name'],
+#                                     values=(stad_procesos[i]['pid'],
+#                                             stad_procesos[i]['username'],
+#                                             stad_procesos[i]['cpu_percent'],
+#                                             stad_procesos[i]['memory_percent'],
+#                                             stad_procesos[i]['status']))
+#         tab1.after(2500, clear_procesos)
+
+def clear_procesos():
+    x = treeProcesos.get_children()
+    if x != '()':
+        for child in x:
+            treeProcesos.delete(child)
+    get_procesos()
 
 
-def show_procesos():
-    if 'stad_procesos' in campos:
-        for i in range(len(psutil.pids())):
-            treeProcesos.insert('', 'end', text=stad_procesos[i]['name'],
-                                    values=(stad_procesos[i]['pid'],
-                                            stad_procesos[i]['username'],
-                                            stad_procesos[i]['cpu_percent'],
-                                            stad_procesos[i]['memory_percent'],
-                                            stad_procesos[i]['status']))
+def treeview_sort_column(tv, col, reverse):
+    l = [(tv.set(k, col), k) for k in tv.get_children('')]
+    l.sort(reverse=reverse)
 
-def show_cargas():
-    if 'carga_cpu' in campos:
-        mutex['carga_cpu'].acquire()
-        for cpu in range(cpu_num):
-            porciento = carga_cpu[cpu]
-            before = 'CPU%s' % str(cpu + 1)
-            after = '%04.1f%%' % porciento
-            w.coords(i, new_xy) # change coordinates
-            w.itemconfig(i, fill="blue") # change color
+    # rearrange items in sorted positions
+    for index, (val, k) in enumerate(l):
+        tv.move(k, '', index)
 
-    #     mutex['carga_cpu'].release()
-    # if 'stad_cpu' in show:
-    #     mutex['stad_cpu'].acquire()
-    #     tiempos = stad_cpu['tiempo']
-    #     freqs = stad_cpu['freq']
-    #     mutex['stad_cpu'].release()
-    # if 'stad_mem' in show:
-    #     mutex['stad_mem'].acquire()
-    #     total = stad_mem[0]
-    #     usado = stad_mem[1]
-    #     porciento = stad_mem[2]
-    #     mutex['stad_mem'].release()
-    #     usd_total = '%4s / %4s' % (usado, total)
-    # if 'stad_vmem' in show:
-    #     mutex['stad_vmem'].acquire()
-    #     total = stad_vmem[0]
-    #     usado = stad_vmem[1]
-    #     porciento = stad_vmem[2]
-    #     mutex['stad_vmem'].release()
-    #     usd_total = '%4s / %4s' % (usado, total)
-    
+    # reverse sort next time
+    tv.heading(col, command=lambda: \
+               treeview_sort_column(tv, col, not reverse))
 
-
-def main():
+# def main():
     # thr_cpu_ld = threading.Thread(target=get_carga_cpu)
     # thr_cpu_ld.start()
     # thr_cpu_st = threading.Thread(target=get_stad_cpu)
@@ -159,52 +158,118 @@ def main():
     # thr_swp_us.start()
     # thr_mem_us =  threading.Thread(target=get_usd_mem)
     # thr_mem_us.start()
-    thr_prc =  threading.Thread(target=get_procesos)
-    thr_prc.start()
+    # thr_prc = threading.Thread(target=get_procesos)
+    # thr_prc.start()
 
-    while 1:
-        sleep(1)
-        show_procesos()
+    # while 1:
+    #     sleep(.5)
+    #     get_stad_cpu()
+
 
 ventana = Tk()
 ventana.title("Proyecto 1: Monitor de SO")
-
-ventana.geometry("700x600+0+0")
+ventana.geometry("715x600+0+0")
+img = tk.Image("photo", file="system-monitor.png")
+ventana.tk.call('wm','iconphoto',ventana._w,img)
 
 note = ttk.Notebook(ventana, height=25)
 
 tab1 = Frame(note)
 tab2 = Frame(note)
 
-note.add(tab1, text = "Procesos",)
-note.add(tab2, text = "Máquina")
+note.add(tab1, text="Procesos")
+note.add(tab2, text="Máquina")
 
+"""Tab 1
+Todo lo perteneciente a la pestaña 1,
+aqui se encuentra la lista de procesos, su  pid,
+el usuario que lo lanza, el porcentaje de cpu, el porcentaje de ram y
+el estado del proceso.
+"""
 treeProcesos = ttk.Treeview(tab1)
 
-treeProcesos["columns"] = ("PId", "Usuario", "CPU %", "Memoria %", "Estado")
+treeProcesos["columns"] = ("PId", "Usuario", "CPU", "Memoria", "Estado")
 
 scrollProcesos = ttk.Scrollbar(tab1)
 scrollProcesos.pack(side=RIGHT, fill=Y)
 
 treeProcesos['yscrollcommand'] = scrollProcesos.set
 treeProcesos.column("PId", width=100)
-
 treeProcesos.column("Usuario", width=120)
-treeProcesos.column("CPU %", width=90)
-treeProcesos.column("Memoria %", width=90)
+treeProcesos.column("CPU", width=90)
+treeProcesos.column("Memoria", width=90)
 treeProcesos.column("Estado", width=72)
-treeProcesos.heading("PId", text="PId")
-treeProcesos.heading("Usuario", text="Usuario")
-treeProcesos.heading("CPU %", text="% CPU")
-treeProcesos.heading("Memoria %", text="% Memoria")
-treeProcesos.heading("Estado", text="Estado")
+treeProcesos.heading("PId", text="PId", command=lambda: \
+                     treeview_sort_column(treeProcesos, "PId", False))
+treeProcesos.heading("Usuario", text="Usuario", command=lambda: \
+                     treeview_sort_column(treeProcesos, "Usuario", False))
+treeProcesos.heading("CPU", text="% CPU", command=lambda: \
+                     treeview_sort_column(treeProcesos, "CPU", False))
+treeProcesos.heading("Memoria", text="% Memoria", command=lambda: \
+                     treeview_sort_column(treeProcesos, "Memoria", False))
+treeProcesos.heading("Estado", text="Estado", command=lambda: \
+                     treeview_sort_column(treeProcesos, "Estado", False))
 
-w = Canvas(tab2, width=200, height=100)
+variable = StringVar()
+lblstatus = Label(ventana, bd=1, state=ACTIVE, relief=SUNKEN, anchor=W,
+                  textvariable=variable,
+                  font=('arial', 9, 'normal'))
 
+user = StringVar()
+lbluser = Label(ventana, bd=1, state=ACTIVE, relief=SUNKEN, anchor=W,
+                  textvariable=user,
+                  font=('arial', 9, 'normal'))
 
-w.pack()
+"""Tab 2
+
+"""
+# leftResumen = Frame(tab2)
+# leftResumen.pack(side=LEFT, fill=Y)
+# rightResumen = Frame(tab2)
+# rightResumen.pack(side=RIGHT, fill=X)
+
+cpuStr = []
+ramStr = StringVar()
+vramStr = StringVar()
+
+lblRam = Label(tab2, bd=1, state=ACTIVE, anchor=W,
+                  textvariable=ramStr,
+                  font=('arial', 11, 'normal'))
+
+lblVram = Label(tab2, bd=1, state=ACTIVE, anchor=W,
+                  textvariable=vramStr,
+                  font=('arial', 11, 'normal'))
+
+lblRam.grid(row=cpu_num+1)
+lblVram.grid(row=cpu_num+2)
+
+for cpu in range(cpu_num):
+    cpuStr.append(StringVar())
+    lblCPU.append(Label(tab2, bd=1, state=ACTIVE, anchor=W,
+                  textvariable=cpuStr[cpu],
+                  font=('arial', 15, 'normal')))
+    barcpu.append(ttk.Progressbar(tab2, orient="horizontal", length=200, mode="determinate"))
+    barcpu[cpu]['maximum'] = 1000
+    lblCPU[cpu].grid(row = cpu, sticky=E)
+    barcpu[cpu].grid(row = cpu, column = 1, sticky = (E,W),padx=5)
+
+barRam = ttk.Progressbar(tab2, orient="horizontal", length=200, mode="determinate")
+barRam['maximum'] = 1000
+barRam.grid(row=cpu_num+1, column = 1, sticky = (E,W),padx=5)
+
+barVram = ttk.Progressbar(tab2, orient="horizontal", length=200, mode="determinate")
+barVram['maximum'] = 1000
+barVram.grid(row=cpu_num+2, column = 1, sticky = (E,W),padx=5)
+
+"""Pack 
+Algunas cosa necesarias para la creacion
+de la ventana, las tablas, los textos y las barras.
+"""
+# listCargas.pack(side=LEFT, fill=Y)
+lblstatus.pack(side=BOTTOM, fill=X)
 treeProcesos.pack(side=LEFT, fill=BOTH, expand=1)
 note.pack(side=LEFT, fill=BOTH, expand=1)
 scrollProcesos.config(command=treeProcesos.yview)
-ventana.after(5, get_procesos)
+tab1.after(200, clear_procesos)
+tab2.after(200, get_carga_cpu)
 ventana.mainloop()

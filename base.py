@@ -135,58 +135,58 @@ def get_process_stats():
 def draw():
     global win
 
-    # def usage_bar(percent, before="", after=""):
-    #     bar = "%s [%s] %s"
-    #     size = win.getmaxyx()[1] - 7 - len(before) - len(after)
-    #     bars = '|' * int(float(percent) / 100 * size)
-    #     spaces = ' ' * (size - len(bars))
-    #     return bar % (before, bars + spaces, after)
+    def usage_bar(percent, before="", after=""):
+        bar = "%s [%s] %s"
+        size = win.getmaxyx()[1] - 7 - len(before) - len(after)
+        bars = '|' * int(float(percent) / 100 * size)
+        spaces = ' ' * (size - len(bars))
+        return bar % (before, bars + spaces, after)
 
     linenum = 0
 
-    # if 'cpu_load' in show:
-    #     mutexes['cpu_load'].acquire()
-    #     for cpu in range(cpu_num):
-    #         percent = cpu_load[cpu]
-    #         before = 'CPU%s' % str(cpu + 1)
-    #         after = '%04.1f%%' % percent
-    #         win.addstr(linenum, 1, usage_bar(percent, before, after))
-    #         linenum += 1
-    #     mutexes['cpu_load'].release()
-    # if 'mem_stats' in show:
-    #     before = 'RAM '
-    #     mutexes['mem_stats'].acquire()
-    #     total = mem_stats[0]
-    #     used = mem_stats[1]
-    #     percent = mem_stats[2]
-    #     mutexes['mem_stats'].release()
-    #     after = '%4s / %4s' % (used, total)
-    #     win.addstr(linenum, 1, usage_bar(percent, before, after))
-    #     linenum += 1
-    # if 'swp_stats' in show:
-    #     before = 'SWAP'
-    #     mutexes['swp_stats'].acquire()
-    #     total = swp_stats[0]
-    #     used = swp_stats[1]
-    #     percent = swp_stats[2]
-    #     mutexes['swp_stats'].release()
-    #     after = '%4s / %4s' % (used, total)
-    #     win.addstr(linenum, 1, usage_bar(percent, before, after))
-    #     linenum += 1
-    # if 'cpu_stats' in show:
-    #     size = int((win.getmaxyx()[1] - 6) / 5)
-    #     mutexes['cpu_stats'].acquire()
-    #     times = cpu_stats['time']
-    #     freqs = cpu_stats['freq']
-    #     mutexes['cpu_stats'].release()
-    #     i = 1
-    #     for n in times:
-    #         win.addstr(linenum, i, "%s: %04.1f%%" % (n, times[n]))
-    #         i += size
-    #     for n in range(len(freqs)):
-    #         win.addstr(linenum, i, "CPU%s: %03.1f GHz" % (n, freqs[n] / 1000))
-    #         i += size
-    #     linenum += 1
+    if 'cpu_load' in show:
+        mutexes['cpu_load'].acquire()
+        for cpu in range(cpu_num):
+            percent = cpu_load[cpu]
+            before = 'CPU%s' % str(cpu + 1)
+            after = '%04.1f%%' % percent
+            win.addstr(linenum, 1, usage_bar(percent, before, after))
+            linenum += 1
+        mutexes['cpu_load'].release()
+    if 'mem_stats' in show:
+        before = 'RAM '
+        mutexes['mem_stats'].acquire()
+        total = mem_stats[0]
+        used = mem_stats[1]
+        percent = mem_stats[2]
+        mutexes['mem_stats'].release()
+        after = '%4s / %4s' % (used, total)
+        win.addstr(linenum, 1, usage_bar(percent, before, after))
+        linenum += 1
+    if 'swp_stats' in show:
+        before = 'SWAP'
+        mutexes['swp_stats'].acquire()
+        total = swp_stats[0]
+        used = swp_stats[1]
+        percent = swp_stats[2]
+        mutexes['swp_stats'].release()
+        after = '%4s / %4s' % (used, total)
+        win.addstr(linenum, 1, usage_bar(percent, before, after))
+        linenum += 1
+    if 'cpu_stats' in show:
+        size = int((win.getmaxyx()[1] - 6) / 5)
+        mutexes['cpu_stats'].acquire()
+        times = cpu_stats['time']
+        freqs = cpu_stats['freq']
+        mutexes['cpu_stats'].release()
+        i = 1
+        for n in times:
+            win.addstr(linenum, i, "%s: %04.1f%%" % (n, times[n]))
+            i += size
+        for n in range(len(freqs)):
+            win.addstr(linenum, i, "CPU%s: %03.1f GHz" % (n, freqs[n] / 1000))
+            i += size
+        linenum += 1
     if 'processes' in show:
         lformat = '%-6s %-10s %-8s %-5s %-5s %s'
         line = lformat % ('PID', 'USER', 'STATUS', 'CPU%', 'MEM%', 'NAME')
